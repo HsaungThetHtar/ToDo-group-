@@ -2,56 +2,67 @@ import React, { useState } from "react";
 
 const API_URL = "http://localhost:5001/api";
 
-function Login({ onLogin, onSwitchToRegister }) {
+function Register({ onSwitchToLogin }) {
+  const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
 
-    if (!username.trim() || !password.trim()) {
-      setError("Username and password are required.");
+    if (!fullName || !username || !password) {
+      setError("All fields are required.");
       return;
     }
 
     try {
-      const response = await fetch(`${API_URL}/login`, {
+      const response = await fetch(`${API_URL}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({
+          full_name: fullName,
+          username,
+          password,
+        }),
       });
 
-      const data = await response.json(); // ✅ ONLY ONCE
+      const data = await response.json();
 
       if (!response.ok) {
-        setError(data.message || "Login failed.");
+        setError(data.message || "Registration failed.");
         return;
       }
 
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("todo_username", data.username);
-
-      onLogin(data.user.username);
-
+      setSuccess("Account created successfully!");
     } catch (err) {
       console.error(err);
-      setError("Network error: Could not connect to the server.");
+      setError("Network error.");
     }
   };
 
   return (
     <div className="text-center">
-      <h2 className="text-xl font-semibold text-gray-700 mb-4">Login</h2>
+      <h2 className="text-xl font-semibold text-gray-700 mb-4">Register</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <input
+          type="text"
+          placeholder="Full Name"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          className="w-full border rounded-lg px-3 py-2"
+        />
+
         <input
           type="text"
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+          className="w-full border rounded-lg px-3 py-2"
         />
 
         <input
@@ -59,27 +70,28 @@ function Login({ onLogin, onSwitchToRegister }) {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+          className="w-full border rounded-lg px-3 py-2"
         />
 
         <button className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-          Login
+          Register
         </button>
       </form>
 
       {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
+      {success && <p className="text-green-600 text-sm mt-3">{success}</p>}
 
       <p className="text-sm mt-4">
-        Don’t have an account?{" "}
+        Already have an account?{" "}
         <button
-          onClick={onSwitchToRegister}
+          onClick={onSwitchToLogin}
           className="text-blue-600 hover:underline"
         >
-          Register
+          Login
         </button>
       </p>
     </div>
   );
 }
 
-export default Login;
+export default Register;

@@ -44,28 +44,39 @@ function TodoList({ username, onLogout }) {
   // CREATE
   const handleAddTodo = async (e) => {
     e.preventDefault();
-    if (!newTask.trim() || !targetDatetime) return;
+
+    if (!newTask.trim() || !targetDatetime) {
+      alert("Task and datetime are required");
+      return;
+    }
 
     try {
       const response = await fetch(`${API_URL}/todos`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          username,
           task: newTask,
-          status: "Todo",
-          targetDatetime,
+          username,
+          target_datetime: targetDatetime,
         }),
       });
 
-      if (!response.ok) return;
+      const data = await response.json();
 
-      const newTodo = await response.json();
-      setTodos([newTodo, ...todos]);
+      if (!response.ok) {
+        alert(data.message || "Failed to add task");
+        return;
+      }
+
+      setTodos([data, ...todos]);
       setNewTask("");
       setTargetDatetime("");
+
     } catch (err) {
       console.error(err);
+      alert("Network error");
     }
   };
 
@@ -107,7 +118,7 @@ function TodoList({ username, onLogout }) {
 
   // SORT & GROUP
   const sortDesc = (a, b) =>
-    new Date(b.targetDatetime) - new Date(a.targetDatetime);
+    new Date(b.target_datetime) - new Date(a.target_datetime);
 
   const todoList = todos
     .filter((t) => t.status === "Todo")
@@ -167,123 +178,91 @@ function TodoList({ username, onLogout }) {
         </form>
       </div>
 
-      {/* Status Groups - Three Column Layout */}
+      {/* Status Columns */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* TODO Column */}
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <div className="bg-yellow-500 px-4 py-3">
-            <h3 className="text-lg font-bold text-white"> Todo</h3>
-            <p className="text-yellow-100 text-sm">{todoList.length} tasks</p>
-          </div>
-
-          <ul className="divide-y max-h-96 overflow-y-auto">
-            {todoList.length === 0 ? (
-              <li className="px-4 py-8 text-center text-gray-400">
-                No tasks yet
-              </li>
-            ) : (
-              todoList.map((todo) => (
-                <TaskCard
-                  key={todo.id}
-                  todo={todo}
-                  onStatusChange={handleStatusChange}
-                  onDelete={handleDeleteTodo}
-                />
-              ))
-            )}
-          </ul>
-        </div>
-
-        {/* DOING Column */}
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <div className="bg-blue-500 px-4 py-3">
-            <h3 className="text-lg font-bold text-white"> Doing</h3>
-            <p className="text-blue-100 text-sm">{doingList.length} tasks</p>
-          </div>
-
-          <ul className="divide-y max-h-96 overflow-y-auto">
-            {doingList.length === 0 ? (
-              <li className="px-4 py-8 text-center text-gray-400">
-                No tasks in progress
-              </li>
-            ) : (
-              doingList.map((todo) => (
-                <TaskCard
-                  key={todo.id}
-                  todo={todo}
-                  onStatusChange={handleStatusChange}
-                  onDelete={handleDeleteTodo}
-                />
-              ))
-            )}
-          </ul>
-        </div>
-
-        {/* DONE Column */}
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <div className="bg-green-500 px-4 py-3">
-            <h3 className="text-lg font-bold text-white">Done</h3>
-            <p className="text-green-100 text-sm">{doneList.length} tasks</p>
-          </div>
-
-          <ul className="divide-y max-h-96 overflow-y-auto">
-            {doneList.length === 0 ? (
-              <li className="px-4 py-8 text-center text-gray-400">
-                No completed tasks
-              </li>
-            ) : (
-              doneList.map((todo) => (
-                <TaskCard
-                  key={todo.id}
-                  todo={todo}
-                  onStatusChange={handleStatusChange}
-                  onDelete={handleDeleteTodo}
-                />
-              ))
-            )}
-          </ul>
-        </div>
+        <TaskColumn title="Todo" color="yellow" list={todoList}
+          onStatusChange={handleStatusChange}
+          onDelete={handleDeleteTodo}
+        />
+        <TaskColumn title="Doing" color="blue" list={doingList}
+          onStatusChange={handleStatusChange}
+          onDelete={handleDeleteTodo}
+        />
+        <TaskColumn title="Done" color="green" list={doneList}
+          onStatusChange={handleStatusChange}
+          onDelete={handleDeleteTodo}
+        />
       </div>
     </div>
   );
 }
 
-// Task Card Component
+// Column Component
+function TaskColumn({ title, color, list, onStatusChange, onDelete }) {
+  const colorMap = {
+    yellow: "bg-yellow-500",
+    blue: "bg-blue-500",
+    green: "bg-green-500",
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-md overflow-hidden">
+      <div className={`${colorMap[color]} px-4 py-3`}>
+        <h3 className="text-lg font-bold text-white">{title}</h3>
+        <p className="text-white text-sm">{list.length} tasks</p>
+      </div>
+
+      <ul className="divide-y max-h-96 overflow-y-auto">
+        {list.length === 0 ? (
+          <li className="px-4 py-8 text-center text-gray-400">
+            No tasks
+          </li>
+        ) : (
+          list.map((todo) => (
+            <TaskCard
+              key={todo.id}
+              todo={todo}
+              onStatusChange={onStatusChange}
+              onDelete={onDelete}
+            />
+          ))
+        )}
+      </ul>
+    </div>
+  );
+}
+
+// Task Card
 function TaskCard({ todo, onStatusChange, onDelete }) {
-  const overdue = isOverdue(todo.targetDatetime);
+  const overdue = isOverdue(todo.target_datetime);
   const isDone = todo.status === "Done";
 
   return (
     <li className={`px-4 py-4 hover:bg-gray-50 transition ${isDone ? "bg-gray-100" : ""}`}>
       <div className="space-y-2">
-        {/* Task Title */}
-        <div className="flex items-start justify-between gap-2">
-          <p className={`font-medium text-gray-800 flex-1 ${isDone ? "line-through text-gray-500" : ""}`}>
+        <div className="flex justify-between gap-2">
+          <p className={`font-medium flex-1 ${isDone ? "line-through text-gray-500" : "text-gray-800"}`}>
             {todo.task}
           </p>
           <button
             onClick={() => onDelete(todo.id)}
-            className="text-gray-400 hover:text-red-500 transition text-lg flex-shrink-0"
-            title="Delete task"
+            className="text-gray-400 hover:text-red-500 transition"
           >
             🗑️
           </button>
         </div>
 
-        {/* Deadline */}
-        <div className={`flex items-center gap-1 text-xs font-medium ${
+        <div className={`text-xs flex items-center gap-1 ${
           overdue && !isDone ? "text-red-600" : "text-gray-600"
         }`}>
-          <span className="text-base">🕐</span>
-          <span>{formatDateTime(todo.targetDatetime)}</span>
-          {overdue && !isDone && <span className="text-red-600 ml-1">Overdue!</span>}
+          🕐 {formatDateTime(todo.target_datetime)}
+          {overdue && !isDone && <span className="ml-1">Overdue!</span>}
         </div>
 
-        {/* Status Selector */}
         <select
           value={todo.status}
           onChange={(e) => onStatusChange(todo.id, e.target.value)}
-          className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-1.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500"
         >
           <option value="Todo">📋 Todo</option>
           <option value="Doing">⚙️ Doing</option>
