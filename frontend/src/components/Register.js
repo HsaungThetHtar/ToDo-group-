@@ -37,12 +37,7 @@ function Register({ onSwitchToLogin }) {
     try {
       const response = await fetch("http://localhost:5001/api/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: fullName,
-          username,
-          password,
-        }),formData
+        body: formData
       });
 
       const data = await response.json();

@@ -3,7 +3,7 @@ import { api } from "../api/api"; // Add this import
 
 // Format datetime for display
 const formatDateTime = (dateString) => {
-  if (!dateString) return "No deadline";
+  if (!dateString) return "No target date";
   const date = new Date(dateString);
   return date.toLocaleString("en-US", {
     month: "short",
@@ -89,15 +89,16 @@ function TodoList({ username, onLogout, onGoToProfile }) {
 };
 
   // UPDATE STATUS - Now uses token automatically!
-  const handleStatusChange = async (id, newStatus) => {
+  const handleStatusChange = async (id, newStatus, newTargetDate) => {
   try {
     const todo = todos.find(t => t.id === id);
+    const targetDateToUse = newTargetDate || todo.target_datetime;
     
-    await api.updateTodo(id, newStatus, todo.targetDatetime); // ✅ Match your database!
+    await api.updateTodo(id, newStatus, targetDateToUse);
 
     setTodos(
       todos.map((todo) =>
-        todo.id === id ? { ...todo, status: newStatus } : todo
+        todo.id === id ? { ...todo, status: newStatus, target_datetime: targetDateToUse } : todo
       )
     );
   } catch (err) {
@@ -259,6 +260,15 @@ function TaskColumn({ title, color, list, onStatusChange, onDelete }) {
 function TaskCard({ todo, onStatusChange, onDelete }) {
   const overdue = isOverdue(todo.target_datetime);
   const isDone = todo.status === "Done";
+  const [isEditingDate, setIsEditingDate] = React.useState(false);
+  const [newDate, setNewDate] = React.useState(todo.target_datetime);
+
+  const handleDateChange = async () => {
+    if (newDate !== todo.target_datetime) {
+      await onStatusChange(todo.id, todo.status, newDate);
+    }
+    setIsEditingDate(false);
+  };
 
   return (
     <li className={`px-4 py-4 hover:bg-gray-50 transition ${isDone ? "bg-gray-100" : ""}`}>
@@ -278,8 +288,38 @@ function TaskCard({ todo, onStatusChange, onDelete }) {
         <div className={`text-xs flex items-center gap-1 ${
           overdue && !isDone ? "text-red-600" : "text-gray-600"
         }`}>
-          🕐 {formatDateTime(todo.target_datetime)}
-          {overdue && !isDone && <span className="ml-1">Overdue!</span>}
+          {isEditingDate ? (
+            <div className="flex gap-2 flex-1">
+              <input
+                type="datetime-local"
+                value={newDate}
+                onChange={(e) => setNewDate(e.target.value)}
+                className="flex-1 px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={handleDateChange}
+                className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+              >
+                ✓
+              </button>
+              <button
+                onClick={() => setIsEditingDate(false)}
+                className="px-2 py-1 bg-gray-400 text-white text-xs rounded hover:bg-gray-500"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <>
+              🕐 <button
+                onClick={() => setIsEditingDate(true)}
+                className="hover:underline cursor-pointer"
+              >
+                {formatDateTime(todo.target_datetime)}
+              </button>
+              {overdue && !isDone && <span className="ml-1">Overdue!</span>}
+            </>
+          )}
         </div>
 
         <select

@@ -207,7 +207,7 @@ app.get('/api/todos', authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     const [rows] = await db.promise().query(  // ADD .promise()
-        "SELECT * FROM todo WHERE user_id = ? ORDER BY id DESC",
+        "SELECT id, username, task, targetDatetime as target_datetime, status, user_id FROM todo WHERE user_id = ? ORDER BY id DESC",
         [userId]
     );
 
@@ -238,7 +238,7 @@ app.post('/api/todos', authenticateToken, async (req, res) => {
     id: result.insertId,
     task,
     status: 'Todo',
-    targetDatetime: targetDatetime
+    target_datetime: targetDatetime
   });
 });
 
