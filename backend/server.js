@@ -67,7 +67,6 @@ async function verifyRecaptcha(token) {
       },
     }
   );
-
   return response.data.success;
 }
 
@@ -98,15 +97,15 @@ app.post('/api/register', upload.single('profile_image'),
         return res.status(400).json({ message: 'Missing fields' });
       }
 
-      // Verify reCAPTCHA
-      if (!recaptchaToken) {
-        return res.status(400).json({ message: 'reCAPTCHA token is required' });
-      }
+    //   // Verify reCAPTCHA
+    //   if (!recaptchaToken) {
+    //     return res.status(400).json({ message: 'reCAPTCHA token is required' });
+    //   }
 
-      const isRecaptchaValid = await verifyRecaptcha(recaptchaToken);
-      if (!isRecaptchaValid) {
-        return res.status(400).json({ message: 'reCAPTCHA verification failed' });
-      }
+    //   const isRecaptchaValid = await verifyRecaptcha(recaptchaToken);
+    //   if (!isRecaptchaValid) {
+    //     return res.status(400).json({ message: 'reCAPTCHA verification failed' });
+    //   }
 
       // Check if username exists - ADD .promise()
       const [existing] = await db.promise().query(
@@ -251,11 +250,16 @@ app.put('/api/todos/:id', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const todoId = req.params.id;
 
-    const [result] = await db.promise().query(  // ADD .promise()
+    // Convert ISO datetime to MySQL format
+    const formattedDatetime = targetDatetime ? 
+        new Date(targetDatetime).toISOString().slice(0, 19).replace('T', ' ') : 
+        null;
+
+    const [result] = await db.promise().query(
         `UPDATE todo 
          SET status = ?, targetDatetime = ?
          WHERE id = ? AND user_id = ?`,
-        [status, targetDatetime, todoId, userId]
+        [status, formattedDatetime, todoId, userId]
     );
 
     if (result.affectedRows === 0) {
