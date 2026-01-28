@@ -1,11 +1,17 @@
 import React, { useState } from "react";
-import { api } from "../api/api"; // Remove useNavigate import
+import ReCAPTCHA from "react-google-recaptcha";
+import { api } from "../api/api";
 
 function Login({ onLogin, onSwitchToRegister }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState(null);
+
+  const handleRecaptchaChange = (token) => {
+    setRecaptchaToken(token);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,8 +24,20 @@ function Login({ onLogin, onSwitchToRegister }) {
       return;
     }
 
+    if (!recaptchaToken) {
+      setError("Please complete the reCAPTCHA.");
+      setLoading(false);
+      return;
+    }
+
     try {
-      const data = await api.login(username, password);
+      const response = await fetch("http://localhost:5001/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, recaptchaToken }),
+      });
+
+      const data = await response.json();
 
       if (!data.token) {
         setError(data.message || "Login failed.");
@@ -27,11 +45,9 @@ function Login({ onLogin, onSwitchToRegister }) {
         return;
       }
 
-      // Store token
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      // Call parent's onLogin (no navigate needed!)
       onLogin(data.user.username);
 
     } catch (err) {
@@ -62,6 +78,14 @@ function Login({ onLogin, onSwitchToRegister }) {
           onChange={(e) => setPassword(e.target.value)}
           className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
         />
+
+        {/* reCAPTCHA */}
+        <div className="flex justify-center">
+          <ReCAPTCHA
+            sitekey="6LftoFgsAAAAACCLAwvct_taGG5q0hDNKcbuTOJm"
+            onChange={handleRecaptchaChange}
+          />
+        </div>
 
         <button
           type="submit"

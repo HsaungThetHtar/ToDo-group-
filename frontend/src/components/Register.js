@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { api } from "../api/api"; // Remove useNavigate import
+import ReCAPTCHA from "react-google-recaptcha";
+import { api } from "../api/api";
 
 function Register({ onSwitchToLogin }) {
   const [fullName, setFullName] = useState("");
@@ -8,6 +9,11 @@ function Register({ onSwitchToLogin }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState(null);
+
+  const handleRecaptchaChange = (token) => {
+    setRecaptchaToken(token);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,19 +27,36 @@ function Register({ onSwitchToLogin }) {
       return;
     }
 
-    try {
-      const data = await api.register(fullName, username, password);
+    if (!recaptchaToken) {
+      setError("Please complete the reCAPTCHA.");
+      setLoading(false);
+      return;
+    }
 
-      if (data.message === "User registered successfully") {
-        setSuccess("Account created successfully! Redirecting to login...");
-        
-        // Redirect to login after 2 seconds
-        setTimeout(() => {
-          onSwitchToLogin(); // Use this instead of navigate!
-        }, 2000);
-      } else {
+    try {
+      const response = await fetch("http://localhost:5001/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: fullName,
+          username,
+          password,
+          recaptchaToken,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
         setError(data.message || "Registration failed.");
+        setLoading(false);
+        return;
       }
+
+      setSuccess("Account created successfully! Redirecting to login...");
+      setTimeout(() => {
+        onSwitchToLogin();
+      }, 2000);
 
     } catch (err) {
       console.error(err);
@@ -71,6 +94,14 @@ function Register({ onSwitchToLogin }) {
           onChange={(e) => setPassword(e.target.value)}
           className="w-full border rounded-lg px-3 py-2"
         />
+
+        {/* reCAPTCHA */}
+        <div className="flex justify-center">
+          <ReCAPTCHA
+            sitekey="6LftoFgsAAAAADqP9vJGl5K0Z8fH9vZ5mW8kN9nH"
+            onChange={handleRecaptchaChange}
+          />
+        </div>
 
         <button
           type="submit"

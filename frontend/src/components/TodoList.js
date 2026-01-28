@@ -90,22 +90,21 @@ function TodoList({ username, onLogout, onGoToProfile }) {
 
   // UPDATE STATUS - Now uses token automatically!
   const handleStatusChange = async (id, newStatus) => {
-    try {
-      // Find the todo to get its target_datetime
-      const todo = todos.find(t => t.id === id);
-      
-      await api.updateTodo(id, newStatus, todo.target_datetime);
+  try {
+    const todo = todos.find(t => t.id === id);
+    
+    await api.updateTodo(id, newStatus, todo.targetDatetime); // ✅ Match your database!
 
-      setTodos(
-        todos.map((todo) =>
-          todo.id === id ? { ...todo, status: newStatus } : todo
-        )
-      );
-    } catch (err) {
-      console.error(err);
-      setError(err.message);
-    }
-  };
+    setTodos(
+      todos.map((todo) =>
+        todo.id === id ? { ...todo, status: newStatus } : todo
+      )
+    );
+  } catch (err) {
+    console.error(err);
+    setError(err.message);
+  }
+};
 
   // DELETE - Now uses token automatically!
   const handleDeleteTodo = async (id) => {
