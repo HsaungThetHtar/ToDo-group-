@@ -313,12 +313,10 @@ app.get('/api/todos', authenticateToken, async (req, res) => {
 
 // 2. CREATE: Add a new todo item
 app.post('/api/todos', authenticateToken, async (req, res) => {
-  console.log("body:",req.body)
   const { task, targetDatetime } = req.body;
   const userId = req.user.id;
   const username = req.user.username
   
-  console.log('task:', task)
   if (!task || !targetDatetime) {
     return res.status(400).json({
       message: "Task and targetDatetime are required"

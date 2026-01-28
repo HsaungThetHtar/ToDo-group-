@@ -119,7 +119,7 @@ function TodoList({ username, onLogout, onGoToProfile }) {
 
   // SORT & GROUP
   const sortDesc = (a, b) =>
-    new Date(b.target_datetime) - new Date(a.target_datetime);
+    new Date(b.targetDatetime) - new Date(a.targetDatetime);
 
   const todoList = todos
     .filter((t) => t.status === "Todo")
@@ -260,7 +260,7 @@ function TaskColumn({ title, color, list, onStatusChange, onDelete }) {
 
 // Task Card
 function TaskCard({ todo, onStatusChange, onDelete }) {
-  const overdue = isOverdue(todo.target_datetime);
+  const overdue = isOverdue(todo.targetDatetime);
   const isDone = todo.status === "Done";
 
   return (
@@ -281,7 +281,7 @@ function TaskCard({ todo, onStatusChange, onDelete }) {
         <div className={`text-xs flex items-center gap-1 ${
           overdue && !isDone ? "text-red-600" : "text-gray-600"
         }`}>
-          🕐 {formatDateTime(todo.target_datetime)}
+          🕐 {formatDateTime(todo.targetDatetime)}
           {overdue && !isDone && <span className="ml-1">Overdue!</span>}
         </div>
 
