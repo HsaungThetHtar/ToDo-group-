@@ -4,6 +4,7 @@ const cors = require('cors');
 const bcrypt = require('bcrypt')
 const path = require('path')
 const jwt = require('jsonwebtoken')
+const axios = require('axios');
 
 const app = express();
 const port = 5001;
@@ -51,7 +52,25 @@ const upload = multer({
 })
 
 //TOKEN (CHIT_KEY)
-const JWT_SECRET = 'Super_Chit_key';
+const JWT_SECRET = 'yourMom67';
+const CAPTCHA_SECRET = '6LftoFgsAAAAACCggm1N1lOr6lRBF1fJUHvP3H-K';
+
+// Recaptcha verification function
+async function verifyRecaptcha(token) {
+  const response = await axios.post(
+    'https://www.google.com/recaptcha/api/siteverify',
+    null,
+    {
+      params: {
+        secret: CAPTCHA_SECRET,
+        response: token,
+      },
+    }
+  );
+
+  return response.data.success;
+}
+
 
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -73,10 +92,20 @@ function authenticateToken(req, res, next) {
 app.post('/api/register', upload.single('profile_image'),
   async (req, res) => {
     try {
-      const { full_name, username, password } = req.body;
+      const { full_name, username, password, recaptchaToken } = req.body;
 
       if (!full_name || !username || !password) {
         return res.status(400).json({ message: 'Missing fields' });
+      }
+
+      // Verify reCAPTCHA
+      if (!recaptchaToken) {
+        return res.status(400).json({ message: 'reCAPTCHA token is required' });
+      }
+
+      const isRecaptchaValid = await verifyRecaptcha(recaptchaToken);
+      if (!isRecaptchaValid) {
+        return res.status(400).json({ message: 'reCAPTCHA verification failed' });
       }
 
       // Check if username exists - ADD .promise()
@@ -119,10 +148,27 @@ app.post('/api/register', upload.single('profile_image'),
 // API: Authentication (Username Only)
 // ------------------------------------
 app.post('/api/login', async (req, res) => {
-    const { username,password } = req.body;
+    const { username, password, recaptchaToken } = req.body;
+
     if (!username || !password) {
-        return res.status(400).send({ message: 'Missing fields' });
+        return res.status(400).json({ message: 'Missing fields' });
     }
+
+    // Verify reCAPTCHA
+    if (!recaptchaToken) {
+        return res.status(400).json({ message: 'reCAPTCHA token is required' });
+    }
+
+    try {
+        const isRecaptchaValid = await verifyRecaptcha(recaptchaToken);
+        if (!isRecaptchaValid) {
+            return res.status(400).json({ message: 'reCAPTCHA verification failed' });
+        }
+    } catch (error) {
+        console.error('reCAPTCHA verification error:', error);
+        return res.status(500).json({ message: 'Server error during verification' });
+    }
+
     try {
         const [rows] = await db.promise().query(  // ADD .promise()
             "SELECT * FROM users WHERE username = ?",
