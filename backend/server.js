@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt')
 const path = require('path')
 const jwt = require('jsonwebtoken')
 const axios = require('axios');
+const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
 const port = 5001;
@@ -54,6 +55,10 @@ const upload = multer({
 //TOKEN (CHIT_KEY)
 const JWT_SECRET = 'yourMom67';
 const CAPTCHA_SECRET = '6LftoFgsAAAAACCggm1N1lOr6lRBF1fJUHvP3H-K';
+const GOOGLE_CLIENT_ID = '7184441548-2ootutg0mua8l6rcmoeh3qamat5rsfa9.apps.googleusercontent.com'; 
+
+// Initialize Google OAuth2 Client
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Recaptcha verification function
 async function verifyRecaptcha(token) {
@@ -195,6 +200,80 @@ app.post('/api/login', async (req, res) => {
 
     } catch (error) {
         res.status(500).json({ message: "Server error"})
+    }
+});
+
+// ------------------------------------
+// API: Google OAuth Login
+// ------------------------------------
+app.post('/api/auth/google', async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ message: 'Token is required' });
+        }
+
+        // Verify the Google token
+        const ticket = await googleClient.verifyIdToken({
+            idToken: token,
+            audience: GOOGLE_CLIENT_ID
+        });
+
+        const payload = ticket.getPayload();
+        const { sub: google_id, email, name, picture } = payload;
+
+        // Check if user exists by google_id
+        const [existingUser] = await db.promise().query(
+            'SELECT * FROM users WHERE google_id = ?',
+            [google_id]
+        );
+
+        let user;
+        if (existingUser.length > 0) {
+            // User exists, login
+            user = existingUser[0];
+        } else {
+            // User doesn't exist, create new account
+            const [result] = await db.promise().query(
+                `INSERT INTO users (google_id, email, username, full_name, profile_image, password_hash)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [google_id, email, name, name, picture, 'oauth-user']
+            );
+            user = {
+                id: result.insertId,
+                google_id,
+                email,
+                username: name,
+                full_name: name,
+                profile_image: picture
+            };
+        }
+
+        // Create JWT token
+        const jwtToken = jwt.sign({
+            id: user.id,
+            username: user.username
+        },
+        JWT_SECRET,
+        { expiresIn: "1h"}
+        );
+
+        res.json({
+            message: "Google login successful",
+            token: jwtToken,
+            user: {
+                id: user.id,
+                username: user.username,
+                full_name: user.full_name,
+                profile_image: user.profile_image
+            }
+        });
+
+    } catch (error) {
+        console.error('Google OAuth error details:', error.message);
+        console.error('Full error:', error);
+        res.status(500).json({ message: "Google authentication failed", error: error.message });
     }
 });
 

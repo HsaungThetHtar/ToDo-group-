@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter } from "react-router-dom"; // Add this import
+import { GoogleOAuthProvider } from "@react-oauth/google";
 import Login from "./components/Login";
 import Register from "./components/Register";
 import TodoList from "./components/TodoList";
@@ -31,52 +32,54 @@ function App() {
   };
 
   return (
-    <BrowserRouter> {/* Add this wrapper */}
-      <div className="min-h-screen bg-gray-100 flex flex-col">
-        {/* HEADER */}
-        <header className="w-full bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <img src={ceiLogo} alt="CEI Logo" className="h-10" />
-            <h1 className="text-xl font-semibold text-gray-800">
-              CEI Todo App
-            </h1>
-          </div>
+    <GoogleOAuthProvider clientId="7184441548-2ootutg0mua8l6rcmoeh3qamat5rsfa9.apps.googleusercontent.com">
+      <BrowserRouter> {/* Add this wrapper */}
+        <div className="min-h-screen bg-gray-100 flex flex-col">
+          {/* HEADER */}
+          <header className="w-full bg-white shadow-sm px-6 py-4 flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <img src={ceiLogo} alt="CEI Logo" className="h-10" />
+              <h1 className="text-xl font-semibold text-gray-800">
+                CEI Todo App
+              </h1>
+            </div>
 
-          
-        </header>
+            
+          </header>
 
-        {/* MAIN */}
-        <main className="flex-1 p-6">
-          <div className="bg-white rounded-xl shadow p-6">
-            {page === "login" && (
-              <Login
-                onLogin={handleLogin}
-                onSwitchToRegister={() => setPage("register")}
-              />
-            )}
+          {/* MAIN */}
+          <main className="flex-1 p-6">
+            <div className="bg-white rounded-xl shadow p-6">
+              {page === "login" && (
+                <Login
+                  onLogin={handleLogin}
+                  onSwitchToRegister={() => setPage("register")}
+                />
+              )}
 
-            {page === "register" && (
-              <Register onSwitchToLogin={() => setPage("login")} />
-            )}
+              {page === "register" && (
+                <Register onSwitchToLogin={() => setPage("login")} />
+              )}
 
-            {page === "todo" && currentUser && (
-              <TodoList
-                username={currentUser}
-                onLogout={handleLogout}
-                onGoToProfile={() => setPage("profile")}
-              />
-            )}
+              {page === "todo" && currentUser && (
+                <TodoList
+                  username={currentUser}
+                  onLogout={handleLogout}
+                  onGoToProfile={() => setPage("profile")}
+                />
+              )}
 
-            {page === "profile" && currentUser && (
-              <EditProfile
-                username={currentUser}
-                onBack={() => setPage("todo")}
-              />
-            )}
-          </div>
-        </main>
-      </div>
-    </BrowserRouter> 
+              {page === "profile" && currentUser && (
+                <EditProfile
+                  username={currentUser}
+                  onBack={() => setPage("todo")}
+                />
+              )}
+            </div>
+          </main>
+        </div>
+      </BrowserRouter>
+    </GoogleOAuthProvider> 
   );
 }
 
