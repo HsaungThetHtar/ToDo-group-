@@ -148,7 +148,11 @@ function TodoList({ username, onLogout, onGoToProfile }) {
       <div className="flex items-center gap-4">
         {profile && (
           <img 
-            src={`http://localhost:5001${profile.profile_image}`} 
+            src={
+      profile.profile_image
+        ? `http://localhost:5001${profile.profile_image}`
+        : "https://via.placeholder.com/150"
+    }
             alt={profile.full_name}
             className="w-12 h-12 rounded-full object-cover ring-2 ring-blue-400 ring-offset-2 cursor-pointer hover:ring-blue-600 hover:ring-4 transition-all"
             onClick = {(onGoToProfile)}

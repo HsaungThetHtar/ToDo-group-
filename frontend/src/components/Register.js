@@ -9,7 +9,7 @@ function Register({ onSwitchToLogin }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
-  const [image, setImage] = useState(null)
+  const [currentimage, setCurrentImage] = useState(null)
 //   const [recaptchaToken, setRecaptchaToken] = useState(null);
 
 
@@ -30,19 +30,14 @@ function Register({ onSwitchToLogin }) {
     formData.append("username", username);
     formData.append("password", password);
 
-    if (image) {
-      formData.append("profile_image", image);
+    if (currentimage) {
+      formData.append("profile_image", currentimage);
     }
 
     try {
       const response = await fetch("http://localhost:5001/api/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: fullName,
-          username,
-          password,
-        }),formData
+        body: formData
       });
 
       const data = await response.json();
@@ -90,7 +85,7 @@ function Register({ onSwitchToLogin }) {
         <input
           type="file"
           accept="image/*"
-          onChange={(e) => setImage(e.target.files[0])}
+          onChange={(e) => setCurrentImage(e.target.files[0])}
           className="w-full"
         />
 

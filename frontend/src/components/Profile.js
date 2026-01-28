@@ -107,7 +107,7 @@ function EditProfile({ username, onBack }) {
         <label className="block text-sm font-semibold mb-2">Current Profile Picture</label>
         {currentImage ? (
           <img
-            src={`http://localhost:5001${currentImage}`}
+            src={`${currentImage}`}
             alt="Current profile"
             className="w-32 h-32 rounded-full object-cover mb-2"
           />

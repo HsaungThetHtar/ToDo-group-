@@ -91,21 +91,11 @@ function authenticateToken(req, res, next) {
 app.post('/api/register', upload.single('profile_image'),
   async (req, res) => {
     try {
-      const { full_name, username, password, recaptchaToken } = req.body;
+      const { full_name, username, password } = req.body;
 
       if (!full_name || !username || !password) {
         return res.status(400).json({ message: 'Missing fields' });
       }
-
-    //   // Verify reCAPTCHA
-    //   if (!recaptchaToken) {
-    //     return res.status(400).json({ message: 'reCAPTCHA token is required' });
-    //   }
-
-    //   const isRecaptchaValid = await verifyRecaptcha(recaptchaToken);
-    //   if (!isRecaptchaValid) {
-    //     return res.status(400).json({ message: 'reCAPTCHA verification failed' });
-    //   }
 
       // Check if username exists - ADD .promise()
       const [existing] = await db.promise().query(
@@ -123,8 +113,7 @@ app.post('/api/register', upload.single('profile_image'),
 
       // Image path (optional)
       const profile_image = req.file
-        ? `/uploads/${req.file.filename}`
-        : null;
+        ? `/uploads/${req.file.filename}`: null;
 
       // Insert user - ADD .promise()
       await db.promise().query(
