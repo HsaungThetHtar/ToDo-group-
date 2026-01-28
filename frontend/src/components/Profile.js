@@ -19,7 +19,7 @@ function EditProfile({ username, onBack }) {
     try {
       const response = await fetch(`${API_URL}/profile/${username}`);
       const data = await response.json();
-      
+      console.log(data);
       setFullName(data.full_name || "");
       setCurrentImage(data.profile_image);
       setLoading(false);
@@ -69,9 +69,17 @@ function EditProfile({ username, onBack }) {
         return;
       }
 
+      // Update current image if a new one was uploaded
+      if (data.profile_image) {
+        setCurrentImage(data.profile_image);
+      }
+      setFile(null);
+      setPreview(null);
+
       alert("✅ Profile updated successfully!");
       onBack();
     } catch (err) {
+      console.error(err);
       setError("Server error. Try again.");
     }
   };
@@ -107,7 +115,7 @@ function EditProfile({ username, onBack }) {
         <label className="block text-sm font-semibold mb-2">Current Profile Picture</label>
         {currentImage ? (
           <img
-            src={`http://localhost:5001${currentImage}`}
+            src={currentImage.startsWith('http') ? currentImage : `http://localhost:5001${currentImage}`}
             alt="Current profile"
             className="w-32 h-32 rounded-full object-cover mb-2"
           />

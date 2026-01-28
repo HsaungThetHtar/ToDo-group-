@@ -223,6 +223,15 @@ app.post('/api/auth/google', async (req, res) => {
         const payload = ticket.getPayload();
         const { sub: google_id, email, name, picture } = payload;
 
+        // Log the payload for debugging
+        // console.log('Google OAuth payload:', {
+        //     google_id,
+        //     email,
+        //     name,
+        //     picture,
+        //     allKeys: Object.keys(payload)
+        // });
+
         // Check if user exists by google_id
         const [existingUser] = await db.promise().query(
             'SELECT * FROM users WHERE google_id = ?',
@@ -233,12 +242,20 @@ app.post('/api/auth/google', async (req, res) => {
         if (existingUser.length > 0) {
             // User exists, login
             user = existingUser[0];
+            // Update picture if it exists and not already set
+            if (picture && !user.profile_image) {
+                await db.promise().query(
+                    'UPDATE users SET profile_image = ? WHERE id = ?',
+                    [picture, user.id]
+                );
+                user.profile_image = picture;
+            }
         } else {
             // User doesn't exist, create new account
             const [result] = await db.promise().query(
                 `INSERT INTO users (google_id, email, username, full_name, profile_image, password_hash)
                  VALUES (?, ?, ?, ?, ?, ?)`,
-                [google_id, email, name, name, picture, 'oauth-user']
+                [google_id, email, name, name, picture || null, 'oauth-user']
             );
             user = {
                 id: result.insertId,
@@ -246,7 +263,7 @@ app.post('/api/auth/google', async (req, res) => {
                 email,
                 username: name,
                 full_name: name,
-                profile_image: picture
+                profile_image: picture || null
             };
         }
 
@@ -391,26 +408,35 @@ app.put(
   async (req, res) => {
     try {
       const { full_name } = req.body;
-      const imagePath = req.file
-        ? `/uploads/${req.file.filename}`
-        : null;
+      const userId = req.user.id;
 
       if (!full_name) {
         return res.status(400).json({ message: 'Full name is required' });
       }
 
+      // Get current profile image
+      const [currentUser] = await db.promise().query(
+        'SELECT profile_image FROM users WHERE id = ?',
+        [userId]
+      );
+
+      // Use new image if uploaded, otherwise keep existing image
+      const imagePath = req.file
+        ? `/uploads/${req.file.filename}`
+        : (currentUser[0]?.profile_image || null);
+
       let sql = 'UPDATE users SET full_name = ?';
       let params = [full_name];
 
-      if (imagePath) {
+      if (req.file) {
         sql += ', profile_image = ?';
         params.push(imagePath);
       }
 
       sql += ' WHERE id = ?';
-      params.push(req.user.id);
+      params.push(userId);
 
-      await db.promise().query(sql, params);  // ADD .promise()
+      await db.promise().query(sql, params);
 
       res.json({ message: 'Profile updated successfully', profile_image: imagePath });
     } catch (err) {

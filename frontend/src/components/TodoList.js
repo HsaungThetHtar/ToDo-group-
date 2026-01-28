@@ -146,14 +146,17 @@ function TodoList({ username, onLogout, onGoToProfile }) {
 
       {/* Profile Picture & Logout */}
       <div className="flex items-center gap-4">
-        {profile && (
+        {profile && profile.profile_image && (
           <img 
-            src={`http://localhost:5001${profile.profile_image}`} 
+            src={profile.profile_image.startsWith('http') ? profile.profile_image : `http://localhost:5001${profile.profile_image}`}
             alt={profile.full_name}
             className="w-12 h-12 rounded-full object-cover ring-2 ring-blue-400 ring-offset-2 cursor-pointer hover:ring-blue-600 hover:ring-4 transition-all"
-            onClick = {(onGoToProfile)}
-            
-            />
+            onClick={onGoToProfile}
+            onError={(e) => {
+              console.error('Profile image failed to load:', profile.profile_image);
+              e.target.style.display = 'none';
+            }}
+          />
         )}
 
         <button
