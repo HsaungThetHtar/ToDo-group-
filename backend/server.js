@@ -1,5 +1,3 @@
-// server.js
-
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
@@ -11,8 +9,8 @@ const app = express();
 const port = 5001;
 
 // Middleware setup
-app.use(cors()); // Allow cross-origin requests from React frontend
-app.use(express.json()); // Enable reading JSON data from request body
+app.use(cors()); 
+app.use(express.json()); 
 app.use(express.urlencoded({extended: true}));
 
 app.use('/uploads',express.static("uploads"))
@@ -20,9 +18,9 @@ app.use('/uploads',express.static("uploads"))
 // --- MySQL Connection Setup ---
 const db = mysql.createConnection({
     host: 'localhost',
-    user: 'root', // CHANGE THIS to your MySQL username
-    password: 'CEiAdmin0', // CHANGE THIS to your MySQL password
-    database: 'ceidb', // Ensure this matches your database name
+    user: 'root',
+    password: 'CEiAdmin0',
+    database: 'ceidb',
     port: 3306,
 });
 
@@ -81,7 +79,7 @@ app.post('/api/register', upload.single('profile_image'),
         return res.status(400).json({ message: 'Missing fields' });
       }
 
-      // Check if username exists
+      // Check if username exists - ADD .promise()
       const [existing] = await db.promise().query(
         'SELECT id FROM users WHERE username = ?',
         [username]
@@ -100,7 +98,7 @@ app.post('/api/register', upload.single('profile_image'),
         ? `/uploads/${req.file.filename}`
         : null;
 
-      // Insert user
+      // Insert user - ADD .promise()
       await db.promise().query(
         `INSERT INTO users (full_name, username, password_hash, profile_image)
          VALUES (?, ?, ?, ?)`,
@@ -121,14 +119,12 @@ app.post('/api/register', upload.single('profile_image'),
 // API: Authentication (Username Only)
 // ------------------------------------
 app.post('/api/login', async (req, res) => {
-    // In this simplified system, we grant "login" access if a username is provided.
-    // WARNING: This is highly insecure and should not be used in a real-world app.
     const { username,password } = req.body;
     if (!username || !password) {
         return res.status(400).send({ message: 'Missing fields' });
     }
     try {
-        const [rows] = await db.promise().query(
+        const [rows] = await db.promise().query(  // ADD .promise()
             "SELECT * FROM users WHERE username = ?",
             [username]
         );
@@ -165,7 +161,7 @@ app.post('/api/login', async (req, res) => {
 app.get('/api/todos', authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
-    const [rows] = await db.promise().query(
+    const [rows] = await db.promise().query(  // ADD .promise()
         "SELECT * FROM todo WHERE user_id = ? ORDER BY id DESC",
         [userId]
     );
@@ -176,25 +172,28 @@ app.get('/api/todos', authenticateToken, async (req, res) => {
 
 // 2. CREATE: Add a new todo item
 app.post('/api/todos', authenticateToken, async (req, res) => {
+  console.log("body:",req.body)
   const { task, targetDatetime } = req.body;
   const userId = req.user.id;
-
+  const username = req.user.username
+  
+  console.log('task:', task)
   if (!task || !targetDatetime) {
     return res.status(400).json({
       message: "Task and targetDatetime are required"
     });
   }
 
-  const [result] = await db.query(
-    'INSERT INTO todo (user_id, task, target_datetime) VALUES (?, ?, ?)',
-    [userId, task, targetDatetime]
+  const [result] = await db.promise().query(  // ADD .promise()
+    'INSERT INTO todo (username, task, targetDatetime, status, user_id) VALUES (?, ?, ?, ?, ?)',
+    [ username, task, targetDatetime, 'Todo', userId]
   );
 
   res.json({
     id: result.insertId,
     task,
     status: 'Todo',
-    targetDatetime
+    targetDatetime: targetDatetime
   });
 });
 
@@ -206,7 +205,7 @@ app.put('/api/todos/:id', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const todoId = req.params.id;
 
-    const [result] = await db.promise().query(
+    const [result] = await db.promise().query(  // ADD .promise()
         `UPDATE todo 
          SET status = ?, targetDatetime = ?
          WHERE id = ? AND user_id = ?`,
@@ -226,7 +225,7 @@ app.delete('/api/todos/:id', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const todoId = req.params.id;
 
-    const [result] = await db.promise().query(
+    const [result] = await db.promise().query(  // ADD .promise()
         "DELETE FROM todo WHERE id = ? AND user_id = ?",
         [todoId, userId]
     );
@@ -239,50 +238,56 @@ app.delete('/api/todos/:id', authenticateToken, async (req, res) => {
 });
 
 
-app.get('/api/profile/:username', (req, res) => {
-  db.query(
-    'SELECT full_name, profile_image FROM users WHERE username = ?',
-    [req.params.username],
-    (err, result) => {
-      if (err) return res.status(500).send(err);
-      res.send(result[0]);
+app.get('/api/profile/:username', async (req, res) => {
+  try {
+    const [result] = await db.promise().query(  // ADD .promise()
+      'SELECT full_name, profile_image FROM users WHERE username = ?',
+      [req.params.username]
+    );
+    
+    if (result.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
     }
-  );
+    
+    res.send(result[0]);
+  } catch (err) {
+    res.status(500).send(err);
+  }
 });
 
 app.put(
   '/api/profile',
   authenticateToken,
   upload.single('profile_image'),
-  (req, res) => {
-    const { full_name } = req.body;
-    const imagePath = req.file
-      ? `/uploads/${req.file.filename}`
-      : null;
+  async (req, res) => {
+    try {
+      const { full_name } = req.body;
+      const imagePath = req.file
+        ? `/uploads/${req.file.filename}`
+        : null;
 
-    if (!full_name) {
-      return res.status(400).json({ message: 'Full name is required' });
-    }
-
-    let sql = 'UPDATE users SET full_name = ?';
-    let params = [full_name];
-
-    if (imagePath) {
-      sql += ', profile_image = ?';
-      params.push(imagePath);
-    }
-
-    sql += ' WHERE id = ?';
-    params.push(req.user.id);
-
-    db.query(sql, params, (err) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ message: 'Database error' });
+      if (!full_name) {
+        return res.status(400).json({ message: 'Full name is required' });
       }
 
+      let sql = 'UPDATE users SET full_name = ?';
+      let params = [full_name];
+
+      if (imagePath) {
+        sql += ', profile_image = ?';
+        params.push(imagePath);
+      }
+
+      sql += ' WHERE id = ?';
+      params.push(req.user.id);
+
+      await db.promise().query(sql, params);  // ADD .promise()
+
       res.json({ message: 'Profile updated successfully', profile_image: imagePath });
-    });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Database error' });
+    }
   }
 );
 

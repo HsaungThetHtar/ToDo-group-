@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-
-const API_URL = "http://localhost:5001/api";
+import { api } from "../api/api"; // Add this import
 
 // Format datetime for display
 const formatDateTime = (dateString) => {
@@ -20,76 +19,82 @@ const isOverdue = (dateString) => {
   return new Date(dateString) < new Date();
 };
 
-function TodoList({ username, onLogout }) {
+function TodoList({ username, onLogout, onGoToProfile }) {
   const [todos, setTodos] = useState([]);
   const [newTask, setNewTask] = useState("");
   const [targetDatetime, setTargetDatetime] = useState("");
+  const [error, setError] = useState("");
+  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
     fetchTodos();
+    fetchProfile();
   }, [username]);
 
-  // READ
+  // Add this function to fetch profile
+  const fetchProfile = async () => {
+    try {
+      const data = await api.getProfile(username);
+      setProfile(data);
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+    }
+  };
+
+  // READ - Now uses token automatically!
   const fetchTodos = async () => {
     try {
-      const response = await fetch(`${API_URL}/todos/${username}`);
-      if (!response.ok) return;
-      const data = await response.json();
+      const data = await api.getTodos();
       setTodos(data);
     } catch (err) {
       console.error(err);
-    }
-  };
-
-  // CREATE
-  const handleAddTodo = async (e) => {
-    e.preventDefault();
-
-    if (!newTask.trim() || !targetDatetime) {
-      alert("Task and datetime are required");
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_URL}/todos`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          task: newTask,
-          username,
-          target_datetime: targetDatetime,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert(data.message || "Failed to add task");
-        return;
+      setError(err.message);
+      // If token is invalid, logout
+      if (err.message.includes("token") || err.message.includes("Invalid")) {
+        onLogout();
       }
-
-      setTodos([data, ...todos]);
-      setNewTask("");
-      setTargetDatetime("");
-
-    } catch (err) {
-      console.error(err);
-      alert("Network error");
     }
   };
 
-  // UPDATE STATUS
+  // CREATE - Now uses token automatically!
+  const handleAddTodo = async (e) => {
+  e.preventDefault();
+  setError("");
+
+  if (!newTask.trim()) {
+    setError("Task is required");
+    return;
+  }
+
+  if (!targetDatetime) {
+    setError("Please select a date and time"); // Better error message
+    return;
+  }
+
+  try {
+    const newTodo = await api.addTodo(newTask, targetDatetime);
+    
+    setTodos([newTodo, ...todos]);
+    setNewTask("");
+    setTargetDatetime("");
+
+  } catch (err) {
+    console.error("Error adding todo:", err);
+    setError(err.message || "Failed to add todo");
+    
+    if (err.message.includes("token")) {
+      onLogout();
+    }
+  }
+};
+
+  // UPDATE STATUS - Now uses token automatically!
   const handleStatusChange = async (id, newStatus) => {
     try {
-      const response = await fetch(`${API_URL}/todos/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!response.ok) return;
+      // Find the todo to get its target_datetime
+      const todo = todos.find(t => t.id === id);
+      
+      await api.updateTodo(id, newStatus, todo.target_datetime);
 
       setTodos(
         todos.map((todo) =>
@@ -98,21 +103,18 @@ function TodoList({ username, onLogout }) {
       );
     } catch (err) {
       console.error(err);
+      setError(err.message);
     }
   };
 
-  // DELETE
+  // DELETE - Now uses token automatically!
   const handleDeleteTodo = async (id) => {
     try {
-      const response = await fetch(`${API_URL}/todos/${id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) return;
-
+      await api.deleteTodo(id);
       setTodos(todos.filter((todo) => todo.id !== id));
     } catch (err) {
       console.error(err);
+      setError(err.message);
     }
   };
 
@@ -133,15 +135,28 @@ function TodoList({ username, onLogout }) {
     .sort(sortDesc);
 
   return (
-    <div className="max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">
-            Welcome, <span className="text-blue-600">{username}</span>
-          </h2>
-          <p className="text-sm text-gray-500">Manage your tasks efficiently</p>
-        </div>
+  <div className="max-w-6xl mx-auto">
+    {/* Header */}
+    <div className="flex justify-between items-center mb-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800">
+          Welcome, <span className="text-blue-600">{username}</span>
+        </h2>
+        <p className="text-sm text-gray-500">Manage your tasks efficiently</p>
+      </div>
+
+      {/* Profile Picture & Logout */}
+      <div className="flex items-center gap-4">
+        {profile && (
+          <img 
+            src={`http://localhost:5001${profile.profile_image}`} 
+            alt={profile.full_name}
+            className="w-12 h-12 rounded-full object-cover ring-2 ring-blue-400 ring-offset-2 cursor-pointer hover:ring-blue-600 hover:ring-4 transition-all"
+            onClick = {(onGoToProfile)}
+            
+            />
+        )}
+
         <button
           onClick={onLogout}
           className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition"
@@ -149,52 +164,61 @@ function TodoList({ username, onLogout }) {
           Logout
         </button>
       </div>
-
-      {/* Add Task Form */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-8 border border-blue-100">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Add New Task</h3>
-        <form onSubmit={handleAddTodo} className="flex flex-col sm:flex-row gap-3">
-          <input
-            type="text"
-            placeholder="What needs to be done?"
-            value={newTask}
-            onChange={(e) => setNewTask(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-
-          <input
-            type="datetime-local"
-            value={targetDatetime}
-            onChange={(e) => setTargetDatetime(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-
-          <button
-            type="submit"
-            className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
-          >
-            Add Task
-          </button>
-        </form>
-      </div>
-
-      {/* Status Columns */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <TaskColumn title="Todo" color="yellow" list={todoList}
-          onStatusChange={handleStatusChange}
-          onDelete={handleDeleteTodo}
-        />
-        <TaskColumn title="Doing" color="blue" list={doingList}
-          onStatusChange={handleStatusChange}
-          onDelete={handleDeleteTodo}
-        />
-        <TaskColumn title="Done" color="green" list={doneList}
-          onStatusChange={handleStatusChange}
-          onDelete={handleDeleteTodo}
-        />
-      </div>
     </div>
-  );
+
+    {/* Error Message */}
+    {error && (
+      <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        {error}
+      </div>
+    )}
+
+    {/* Add Task Form */}
+    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-8 border border-blue-100">
+      <h3 className="text-lg font-semibold text-gray-800 mb-4">Add New Task</h3>
+      <form onSubmit={handleAddTodo} className="flex flex-col sm:flex-row gap-3">
+        <input
+          type="text"
+          placeholder="What needs to be done?"
+          value={newTask}
+          onChange={(e) => setNewTask(e.target.value)}
+          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+
+        <input
+          type="datetime-local"
+          value={targetDatetime}
+          onChange={(e) => setTargetDatetime(e.target.value)}
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          required
+        />
+
+        <button
+          type="submit"
+          className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
+        >
+          Add Task
+        </button>
+      </form>
+    </div>
+
+    {/* Status Columns */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <TaskColumn title="Todo" color="yellow" list={todoList}
+        onStatusChange={handleStatusChange}
+        onDelete={handleDeleteTodo}
+      />
+      <TaskColumn title="Doing" color="blue" list={doingList}
+        onStatusChange={handleStatusChange}
+        onDelete={handleDeleteTodo}
+      />
+      <TaskColumn title="Done" color="green" list={doneList}
+        onStatusChange={handleStatusChange}
+        onDelete={handleDeleteTodo}
+      />
+    </div>
+  </div>
+);
 }
 
 // Column Component

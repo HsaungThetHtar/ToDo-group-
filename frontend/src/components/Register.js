@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-
-const API_URL = "http://localhost:5001/api";
+import { api } from "../api/api"; // Remove useNavigate import
 
 function Register({ onSwitchToLogin }) {
   const [fullName, setFullName] = useState("");
@@ -8,39 +7,39 @@ function Register({ onSwitchToLogin }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
+    setLoading(true);
 
     if (!fullName || !username || !password) {
       setError("All fields are required.");
+      setLoading(false);
       return;
     }
 
     try {
-      const response = await fetch(`${API_URL}/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: fullName,
-          username,
-          password,
-        }),
-      });
+      const data = await api.register(fullName, username, password);
 
-      const data = await response.json();
-
-      if (!response.ok) {
+      if (data.message === "User registered successfully") {
+        setSuccess("Account created successfully! Redirecting to login...");
+        
+        // Redirect to login after 2 seconds
+        setTimeout(() => {
+          onSwitchToLogin(); // Use this instead of navigate!
+        }, 2000);
+      } else {
         setError(data.message || "Registration failed.");
-        return;
       }
 
-      setSuccess("Account created successfully!");
     } catch (err) {
       console.error(err);
       setError("Network error.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -73,8 +72,12 @@ function Register({ onSwitchToLogin }) {
           className="w-full border rounded-lg px-3 py-2"
         />
 
-        <button className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-          Register
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+        >
+          {loading ? "Creating account..." : "Register"}
         </button>
       </form>
 

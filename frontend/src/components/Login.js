@@ -1,43 +1,44 @@
 import React, { useState } from "react";
-
-const API_URL = "http://localhost:5001/api";
+import { api } from "../api/api"; // Remove useNavigate import
 
 function Login({ onLogin, onSwitchToRegister }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
     if (!username.trim() || !password.trim()) {
       setError("Username and password are required.");
+      setLoading(false);
       return;
     }
 
     try {
-      const response = await fetch(`${API_URL}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
+      const data = await api.login(username, password);
 
-      const data = await response.json(); // ✅ ONLY ONCE
-
-      if (!response.ok) {
+      if (!data.token) {
         setError(data.message || "Login failed.");
+        setLoading(false);
         return;
       }
 
+      // Store token
       localStorage.setItem("token", data.token);
-      localStorage.setItem("todo_username", data.username);
+      localStorage.setItem("user", JSON.stringify(data.user));
 
+      // Call parent's onLogin (no navigate needed!)
       onLogin(data.user.username);
 
     } catch (err) {
       console.error(err);
       setError("Network error: Could not connect to the server.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -62,15 +63,19 @@ function Login({ onLogin, onSwitchToRegister }) {
           className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
         />
 
-        <button className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-          Login
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+        >
+          {loading ? "Logging in..." : "Login"}
         </button>
       </form>
 
       {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
 
       <p className="text-sm mt-4">
-        Don’t have an account?{" "}
+        Don't have an account?{" "}
         <button
           onClick={onSwitchToRegister}
           className="text-blue-600 hover:underline"
