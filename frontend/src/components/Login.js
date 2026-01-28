@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
+import { GoogleLogin } from "@react-oauth/google";
 import { api } from "../api/api";
 
 function Login({ onLogin, onSwitchToRegister }) {
@@ -11,6 +12,40 @@ function Login({ onLogin, onSwitchToRegister }) {
 
   const handleRecaptchaChange = (token) => {
     setRecaptchaToken(token);
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      setError("");
+      setLoading(true);
+
+      const response = await fetch("http://localhost:5001/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: credentialResponse.credential }),
+      });
+
+      const data = await response.json();
+
+      if (!data.token) {
+        setError(data.message || "Google login failed.");
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      onLogin(data.user.username);
+    } catch (err) {
+      console.error(err);
+      setError("Network error: Could not connect to the server.");
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    setError("Google login failed. Please try again.");
   };
 
   const handleSubmit = async (e) => {
@@ -95,6 +130,16 @@ function Login({ onLogin, onSwitchToRegister }) {
           {loading ? "Logging in..." : "Login"}
         </button>
       </form>
+
+      <div className="mt-4">
+        <p className="text-gray-600 text-sm mb-3">Or login with:</p>
+        <div className="flex justify-center">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+          />
+        </div>
+      </div>
 
       {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
 
