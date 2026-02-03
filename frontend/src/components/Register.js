@@ -9,11 +9,7 @@ function Register({ onSwitchToLogin }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
-<<<<<<< HEAD
-  const [currentimage, setCurrentImage] = useState(null)
-=======
   const [currentImage, setCurrentImage] = useState(null)
->>>>>>> f6e530edaf59b7cce9a158fd36059e22c620047a
 //   const [recaptchaToken, setRecaptchaToken] = useState(null);
 
 
@@ -34,23 +30,14 @@ function Register({ onSwitchToLogin }) {
     formData.append("username", username);
     formData.append("password", password);
 
-<<<<<<< HEAD
-    if (currentimage) {
-      formData.append("profile_image", currentimage);
-=======
     if (currentImage) {
       formData.append("profile_image", currentImage);
->>>>>>> f6e530edaf59b7cce9a158fd36059e22c620047a
     }
 
     try {
       const response = await fetch("http://localhost:5001/api/register", {
         method: "POST",
-<<<<<<< HEAD
-        body: formData
-=======
         body: formData,
->>>>>>> f6e530edaf59b7cce9a158fd36059e22c620047a
       });
 
       const data = await response.json();
