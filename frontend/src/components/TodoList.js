@@ -119,7 +119,7 @@ function TodoList({ username, onLogout, onGoToProfile }) {
 
   // SORT & GROUP
   const sortDesc = (a, b) =>
-    new Date(b.target_datetime) - new Date(a.target_datetime);
+    new Date(b.targetDatetime) - new Date(a.targetDatetime);
 
   const todoList = todos
     .filter((t) => t.status === "Todo")
@@ -146,18 +146,17 @@ function TodoList({ username, onLogout, onGoToProfile }) {
 
       {/* Profile Picture & Logout */}
       <div className="flex items-center gap-4">
-        {profile && (
+        {profile && profile.profile_image && (
           <img 
-            src={
-      profile.profile_image
-        ? `http://localhost:5001${profile.profile_image}`
-        : "https://via.placeholder.com/150"
-    }
+            src={profile.profile_image.startsWith('http') ? profile.profile_image : `http://localhost:5001${profile.profile_image}`}
             alt={profile.full_name}
             className="w-12 h-12 rounded-full object-cover ring-2 ring-blue-400 ring-offset-2 cursor-pointer hover:ring-blue-600 hover:ring-4 transition-all"
-            onClick = {(onGoToProfile)}
-            
-            />
+            onClick={onGoToProfile}
+            onError={(e) => {
+              console.error('Profile image failed to load:', profile.profile_image);
+              e.target.style.display = 'none';
+            }}
+          />
         )}
 
         <button
@@ -261,7 +260,7 @@ function TaskColumn({ title, color, list, onStatusChange, onDelete }) {
 
 // Task Card
 function TaskCard({ todo, onStatusChange, onDelete }) {
-  const overdue = isOverdue(todo.target_datetime);
+  const overdue = isOverdue(todo.targetDatetime);
   const isDone = todo.status === "Done";
 
   return (
@@ -282,7 +281,7 @@ function TaskCard({ todo, onStatusChange, onDelete }) {
         <div className={`text-xs flex items-center gap-1 ${
           overdue && !isDone ? "text-red-600" : "text-gray-600"
         }`}>
-          🕐 {formatDateTime(todo.target_datetime)}
+          🕐 {formatDateTime(todo.targetDatetime)}
           {overdue && !isDone && <span className="ml-1">Overdue!</span>}
         </div>
 
