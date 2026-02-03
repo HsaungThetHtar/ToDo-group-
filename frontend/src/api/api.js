@@ -71,4 +71,16 @@ export const api = {
   
   // Profile
   getProfile: (username) => apiRequest(`/profile/${username}`),
+  // Teams
+  getTeams: () => apiRequest('/teams'),
+  createTeam: (name, members) => apiRequest('/teams', { method: 'POST', body: JSON.stringify({ name, members }) }),
+  addTeamMember: (teamId, user_id) => apiRequest(`/teams/${teamId}/members`, { method: 'POST', body: JSON.stringify({ user_id }) }),
+  removeTeamMember: (teamId, userId) => apiRequest(`/teams/${teamId}/members/${userId}`, { method: 'DELETE' }),
+  // Team tasks
+  getTeamTasks: (teamId) => apiRequest(`/teams/${teamId}/tasks`),
+  createTeamTask: (teamId, title, description, assignee_id, targetDatetime) => apiRequest(`/teams/${teamId}/tasks`, { method: 'POST', body: JSON.stringify({ title, description, assignee_id, targetDatetime }) }),
+  updateTeamTask: (teamId, taskId, updates) => apiRequest(`/teams/${teamId}/tasks/${taskId}`, { method: 'PUT', body: JSON.stringify(updates) }),
+  // Users
+  getUsers: () => apiRequest('/users'),
+  getTeamMembers: (teamId) => apiRequest(`/teams/${teamId}/members`),
 };

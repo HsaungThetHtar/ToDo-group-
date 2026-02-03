@@ -399,6 +399,38 @@ app.get('/api/profile/:username', async (req, res) => {
   }
 });
 
+// Return list of users for dropdowns (requires auth)
+app.get('/api/users', authenticateToken, async (req, res) => {
+  try {
+    const [rows] = await db.promise().query(
+      'SELECT id, username, full_name FROM users ORDER BY username'
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching users:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get members of a specific team
+app.get('/api/teams/:teamId/members', authenticateToken, async (req, res) => {
+  try {
+    const teamId = req.params.teamId;
+    const [rows] = await db.promise().query(
+      `SELECT u.id, u.username, u.full_name, tm.is_admin
+       FROM team_members tm
+       JOIN users u ON u.id = tm.user_id
+       WHERE tm.team_id = ?
+       ORDER BY u.username`,
+      [teamId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching team members:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 app.put(
   '/api/profile',
   authenticateToken,
@@ -444,6 +476,241 @@ app.put(
   }
 );
 
+// Start the server
+
+// --- Team & Team-Task Helpers and Routes ---
+
+async function isTeamMember(teamId, userId) {
+  const [rows] = await db.promise().query(
+    'SELECT * FROM team_members WHERE team_id = ? AND user_id = ?',
+    [teamId, userId]
+  );
+  return rows.length > 0;
+}
+
+async function isTeamAdmin(teamId, userId) {
+  const [rows] = await db.promise().query(
+    'SELECT * FROM team_members WHERE team_id = ? AND user_id = ? AND is_admin = 1',
+    [teamId, userId]
+  );
+  return rows.length > 0;
+}
+
+// Create a new team. Creator becomes the team admin.
+app.post('/api/teams', authenticateToken, async (req, res) => {
+  try {
+    const { name, members } = req.body; // members: optional array of user IDs
+    const creatorId = req.user.id;
+
+    if (!name) return res.status(400).json({ message: 'Team name required' });
+
+    const [result] = await db.promise().query(
+      'INSERT INTO teams (name, created_by) VALUES (?, ?)',
+      [name, creatorId]
+    );
+
+    const teamId = result.insertId;
+
+    // Add creator as admin
+    await db.promise().query(
+      'INSERT INTO team_members (team_id, user_id, is_admin) VALUES (?, ?, 1)',
+      [teamId, creatorId]
+    );
+
+    // Optionally add other members (non-admin)
+    if (Array.isArray(members)) {
+      for (const uid of members) {
+        if (uid === creatorId) continue;
+        try {
+          await db.promise().query(
+            'INSERT IGNORE INTO team_members (team_id, user_id, is_admin) VALUES (?, ?, 0)',
+            [teamId, uid]
+          );
+        } catch (e) {
+          // ignore individual member add errors
+        }
+      }
+    }
+
+    res.status(201).json({ message: 'Team created', teamId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get teams for the logged-in user (as member or admin)
+app.get('/api/teams', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const [rows] = await db.promise().query(
+      `SELECT t.id, t.name, t.created_by, tm.is_admin
+       FROM teams t
+       JOIN team_members tm ON tm.team_id = t.id
+       WHERE tm.user_id = ?`,
+      [userId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Add a member to a team (admin only)
+app.post('/api/teams/:teamId/members', authenticateToken, async (req, res) => {
+  try {
+    const teamId = req.params.teamId;
+    const { user_id } = req.body;
+    const actorId = req.user.id;
+
+    if (!await isTeamAdmin(teamId, actorId)) {
+      return res.status(403).json({ message: 'Only team admin can add members' });
+    }
+
+    // ensure user exists
+    const [userRows] = await db.promise().query('SELECT id FROM users WHERE id = ?', [user_id]);
+    if (userRows.length === 0) return res.status(404).json({ message: 'User not found' });
+
+    await db.promise().query(
+      'INSERT IGNORE INTO team_members (team_id, user_id, is_admin) VALUES (?, ?, 0)',
+      [teamId, user_id]
+    );
+
+    res.json({ message: 'Member added' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Remove a member from a team (admin only)
+app.delete('/api/teams/:teamId/members/:userId', authenticateToken, async (req, res) => {
+  try {
+    const teamId = req.params.teamId;
+    const userId = req.params.userId;
+    const actorId = req.user.id;
+
+    if (!await isTeamAdmin(teamId, actorId)) {
+      return res.status(403).json({ message: 'Only team admin can remove members' });
+    }
+
+    // prevent removing the last admin or self-removal that would leave no admin
+    const [adminRows] = await db.promise().query(
+      'SELECT user_id FROM team_members WHERE team_id = ? AND is_admin = 1',
+      [teamId]
+    );
+
+    if (adminRows.length === 1 && adminRows[0].user_id == userId) {
+      return res.status(400).json({ message: 'Cannot remove the only team admin' });
+    }
+
+    await db.promise().query(
+      'DELETE FROM team_members WHERE team_id = ? AND user_id = ?',
+      [teamId, userId]
+    );
+
+    res.json({ message: 'Member removed' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Create a team task (admin only). Assign to a single team member.
+app.post('/api/teams/:teamId/tasks', authenticateToken, async (req, res) => {
+  try {
+    const teamId = req.params.teamId;
+    const { title, description, assignee_id, targetDatetime } = req.body;
+    const actorId = req.user.id;
+
+    if (!title) return res.status(400).json({ message: 'Title required' });
+
+    if (!await isTeamAdmin(teamId, actorId)) {
+      return res.status(403).json({ message: 'Only team admin can create tasks' });
+    }
+
+    // if assignee provided, ensure they are a member
+    if (assignee_id) {
+      if (!await isTeamMember(teamId, assignee_id)) {
+        return res.status(400).json({ message: 'Assignee must be a team member' });
+      }
+    }
+
+    const formattedDatetime = targetDatetime ? new Date(targetDatetime).toISOString().slice(0,19).replace('T',' ') : null;
+
+    const [result] = await db.promise().query(
+      `INSERT INTO team_tasks (team_id, title, description, assignee_id, target_datetime, created_by)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [teamId, title, description || null, assignee_id || null, formattedDatetime, actorId]
+    );
+
+    res.status(201).json({ message: 'Task created', taskId: result.insertId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get tasks for a team (members can view)
+app.get('/api/teams/:teamId/tasks', authenticateToken, async (req, res) => {
+  try {
+    const teamId = req.params.teamId;
+    const userId = req.user.id;
+
+    if (!await isTeamMember(teamId, userId)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const [rows] = await db.promise().query(
+      `SELECT tt.*, u.username as assignee_username, u.full_name as assignee_full_name
+       FROM team_tasks tt
+       LEFT JOIN users u ON u.id = tt.assignee_id
+       WHERE tt.team_id = ?
+       ORDER BY tt.created_at DESC`,
+      [teamId]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update task status/targetDatetime (only team admin or assigned user)
+app.put('/api/teams/:teamId/tasks/:taskId', authenticateToken, async (req, res) => {
+  try {
+    const teamId = req.params.teamId;
+    const taskId = req.params.taskId;
+    const userId = req.user.id;
+    const { status, targetDatetime } = req.body;
+
+    // fetch task
+    const [tasks] = await db.promise().query('SELECT * FROM team_tasks WHERE id = ? AND team_id = ?', [taskId, teamId]);
+    if (tasks.length === 0) return res.status(404).json({ message: 'Task not found' });
+    const task = tasks[0];
+
+    const actorIsAdmin = await isTeamAdmin(teamId, userId);
+    const actorIsAssignee = (task.assignee_id && task.assignee_id == userId);
+
+    if (!actorIsAdmin && !actorIsAssignee) {
+      return res.status(403).json({ message: 'Only team admin or assignee can modify status' });
+    }
+
+    const formattedDatetime = targetDatetime ? new Date(targetDatetime).toISOString().slice(0,19).replace('T',' ') : null;
+
+    const [result] = await db.promise().query(
+      `UPDATE team_tasks SET status = ?, target_datetime = ? WHERE id = ? AND team_id = ?`,
+      [status || task.status, formattedDatetime, taskId, teamId]
+    );
+
+    res.json({ message: 'Task updated' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 // Start the server
 app.listen(port, () => {
