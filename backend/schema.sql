@@ -1,6 +1,10 @@
 -- Complete Database Schema for ToDo Group Application
 -- Import into phpMyAdmin for ceidb database
 
+-- Create database and select it for import
+CREATE DATABASE IF NOT EXISTS `ceidb` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+USE `ceidb`;
+
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
 SET time_zone = "+00:00";
@@ -14,15 +18,14 @@ CREATE TABLE IF NOT EXISTS `users` (
   `username` varchar(50) NOT NULL,
   `password_hash` varchar(255) DEFAULT NULL,
   `profile_image` varchar(255) DEFAULT NULL,
-  `google_id` varchar(255) UNIQUE DEFAULT NULL,
-  `email` varchar(255) UNIQUE DEFAULT NULL,
+  `google_id` varchar(255) DEFAULT NULL,
+  `email` varchar(255) DEFAULT NULL,
   `oauth_provider` varchar(50) DEFAULT 'local',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`),
   UNIQUE KEY `email` (`email`),
-  KEY `idx_google_id` (`google_id`),
-  KEY `idx_email` (`email`)
+  UNIQUE KEY `idx_google_id` (`google_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- ========================================
